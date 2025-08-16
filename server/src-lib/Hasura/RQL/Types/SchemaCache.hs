@@ -788,6 +788,7 @@ getLogicalModelBoolExpDeps source logicalModelLocation = \case
   BoolAnd exps -> concatMap (getLogicalModelBoolExpDeps source logicalModelLocation) exps
   BoolOr exps -> concatMap (getLogicalModelBoolExpDeps source logicalModelLocation) exps
   BoolNot e -> getLogicalModelBoolExpDeps source logicalModelLocation e
+  BoolSessionVar _ -> [] -- Session variable conditions don't create schema dependencies
   BoolField fld -> getLogicalModelColExpDeps source logicalModelLocation fld
   BoolExists (GExists refqt whereExp) -> do
     let table :: SchemaObjId
@@ -848,6 +849,7 @@ getBoolExpDeps' = \case
   BoolAnd exps -> procExps exps
   BoolOr exps -> procExps exps
   BoolNot e -> getBoolExpDeps' e
+  BoolSessionVar _ -> pure [] -- Session variable conditions don't create schema dependencies
   BoolField fld -> getColExpDeps fld
   BoolExists (GExists refqt whereExp) -> do
     BoolExpCtx {source} <- ask

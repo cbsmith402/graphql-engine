@@ -413,6 +413,10 @@ translateBoolExp sourceName columnStack = \case
         pure (fmap (J.String) result)
     pure
       $ API.ApplyBinaryArrayComparisonOperator API.In (API.ComparisonColumn API.CurrentTable (API.mkColumnSelector (API.ColumnName (toTxt colFld))) (API.ScalarType (toTxt lhsColType)) Nothing) lookupLst (API.ScalarType (toTxt lhsColType))
+  BoolSessionVar _sessionVarCondition ->
+    -- For now, session variable conditions are not supported in DataConnector
+    -- This could be enhanced in the future to pass session variable info to the connector
+    throwError $ err400 NotSupported "Session variable conditions are not yet supported in DataConnector backend"
   BoolExists GExists {..} ->
     let tableName = Witch.from _geTable
      in API.Exists (API.UnrelatedTable tableName) <$> translateBoolExp (API.TNTable tableName) emptyColumnStack _geWhere

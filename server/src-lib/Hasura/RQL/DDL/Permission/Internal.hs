@@ -177,6 +177,9 @@ annBoolExp rhsParser rootFieldInfoMap fim boolExp =
         refFields <- withPathK "_table" $ askFieldInfoMapSource refqt
         annWhereExp <- withPathK "_where" $ annBoolExp rhsParser rootFieldInfoMap refFields whereExp
         return $ BoolExists $ GExists refqt annWhereExp
+    BoolSessionVar sessionVarCondition ->
+      -- Session variable conditions pass through unchanged in annotation
+      return $ BoolSessionVar sessionVarCondition
     BoolField fld -> BoolField <$> annColExp rhsParser rootFieldInfoMap fim fld
   where
     procExps = mapM (annBoolExp rhsParser rootFieldInfoMap fim)

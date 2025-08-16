@@ -1838,6 +1838,9 @@ fromGBoolExp =
       fmap OrExpression (traverse fromGBoolExp expressions)
     Ir.BoolNot expression -> fmap NotExpression (fromGBoolExp expression)
     Ir.BoolExists gExists -> fmap ExistsExpression (fromGExists gExists)
+    Ir.BoolSessionVar _sessionVarCondition ->
+      -- Session variable conditions are not currently supported in BigQuery backend
+      refute (pure (UnsupportedOpExpG Ir.ANISNULL))
     Ir.BoolField expression -> pure expression
 
 --------------------------------------------------------------------------------

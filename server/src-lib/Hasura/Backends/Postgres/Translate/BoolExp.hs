@@ -9,8 +9,11 @@ module Hasura.Backends.Postgres.Translate.BoolExp
   )
 where
 
+import Data.Aeson (fromJSON, Result(..))
 import Data.HashMap.Strict qualified as HashMap
+import Data.Text qualified as T
 import Data.Text.Extended (ToTxt, toTxt)
+import Hasura.Authentication.Session (fromSessionVariable)
 import Hasura.Authentication.User (UserInfo (..))
 import Hasura.Backends.Postgres.SQL.DML qualified as S
 import Hasura.Backends.Postgres.SQL.Types hiding (TableName)
@@ -128,6 +131,31 @@ translateBoolExp userInfo = \case
 
     whereExp <- withCurrentTable (S.QualifiedIdentifier identifier Nothing) (translateBoolExp userInfo wh)
     return $ S.mkExists (S.FISimple currTableReference (Just alias)) whereExp
+  BoolSessionVar (SessionVarCondition op var value) -> do
+    -- Generate dynamic SQL that accesses session variables at execution time
+    -- instead of resolving them at planning time
+    let sessionVarAccessor = S.SEOpApp (S.SQLOp "->>") [S.SEPrep 1, S.SELit $ fromSessionVariable var]
+    pure $ case op of
+      SVOEquals ->
+        case fromJSON value of
+          Success (expectedValue :: T.Text) -> 
+            S.BECompare S.SEQ sessionVarAccessor (S.SELit expectedValue)
+          _ -> S.BELit False
+      SVONotEquals ->
+        case fromJSON value of
+          Success (expectedValue :: T.Text) -> 
+            S.BECompare S.SNE sessionVarAccessor (S.SELit expectedValue)
+          _ -> S.BELit False
+      SVOContains ->
+        case fromJSON value of
+          Success (expectedValue :: T.Text) -> 
+            S.BECompare S.SContains sessionVarAccessor (S.SELit expectedValue)
+          _ -> S.BELit False
+      SVOIn ->
+        case fromJSON value of
+          Success (expectedList :: [T.Text]) -> 
+            S.BECompareAny S.SEQ sessionVarAccessor (S.SETyAnn (S.SEArray (map S.SELit expectedList)) (S.TypeAnn "text[]"))
+          _ -> S.BELit False
   BoolField boolExp -> case boolExp of
     AVColumn colInfo redactionExp opExps -> do
       BoolExpCtx {rootReference, currTableReference} <- ask
@@ -526,3 +554,4 @@ withRedactionExp tableQual redactionExp userInfo sqlExpression =
     RedactIfFalse gBoolExp -> do
       boolExp <- S.simplifyBoolExp <$> toSQLBoolExp userInfo tableQual gBoolExp
       pure $ S.SECond boolExp sqlExpression S.SENull
+
