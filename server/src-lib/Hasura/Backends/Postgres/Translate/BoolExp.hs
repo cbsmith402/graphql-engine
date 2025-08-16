@@ -13,7 +13,7 @@ import Data.Aeson (fromJSON, Result(..))
 import Data.HashMap.Strict qualified as HashMap
 import Data.Text qualified as T
 import Data.Text.Extended (ToTxt, toTxt)
-import Hasura.Authentication.Session (fromSessionVariable)
+import Hasura.Authentication.Session (getSessionVariableValue)
 import Hasura.Authentication.User (UserInfo (..))
 import Hasura.Backends.Postgres.SQL.DML qualified as S
 import Hasura.Backends.Postgres.SQL.Types hiding (TableName)
@@ -132,30 +132,38 @@ translateBoolExp userInfo = \case
     whereExp <- withCurrentTable (S.QualifiedIdentifier identifier Nothing) (translateBoolExp userInfo wh)
     return $ S.mkExists (S.FISimple currTableReference (Just alias)) whereExp
   BoolSessionVar (SessionVarCondition op var value) -> do
-    -- Generate dynamic SQL that accesses session variables at execution time
-    -- instead of resolving them at planning time
-    let sessionVarAccessor = S.SEOpApp (S.SQLOp "->>") [S.SEPrep 1, S.SELit $ fromSessionVariable var]
-    pure $ case op of
-      SVOEquals ->
-        case fromJSON value of
-          Success (expectedValue :: T.Text) -> 
-            S.BECompare S.SEQ sessionVarAccessor (S.SELit expectedValue)
-          _ -> S.BELit False
-      SVONotEquals ->
-        case fromJSON value of
-          Success (expectedValue :: T.Text) -> 
-            S.BECompare S.SNE sessionVarAccessor (S.SELit expectedValue)
-          _ -> S.BELit False
-      SVOContains ->
-        case fromJSON value of
-          Success (expectedValue :: T.Text) -> 
-            S.BECompare S.SContains sessionVarAccessor (S.SELit expectedValue)
-          _ -> S.BELit False
-      SVOIn ->
-        case fromJSON value of
-          Success (expectedList :: [T.Text]) -> 
-            S.BECompareAny S.SEQ sessionVarAccessor (S.SETyAnn (S.SEArray (map S.SELit expectedList)) (S.TypeAnn "text[]"))
-          _ -> S.BELit False
+    -- Check if we have session variables available and can resolve this specific variable
+    let sessionVars = _uiSession userInfo
+        sessionValueMaybe = getSessionVariableValue var sessionVars
+    case sessionValueMaybe of
+      Nothing -> do
+        -- Session variable not available (EXPLAIN without session context or missing variable)
+        -- Generate SQL that will evaluate to false, allowing EXPLAIN to work
+        pure $ S.BELit False
+      Just sessionValue -> do
+        -- Session variable is available - resolve immediately to avoid parameter binding issues
+        -- This works for both normal queries and EXPLAIN queries
+        pure $ case op of
+          SVOEquals ->
+            case fromJSON value of
+              Success (expectedValue :: T.Text) -> 
+                S.BELit $ sessionValue == expectedValue
+              _ -> S.BELit False
+          SVONotEquals ->
+            case fromJSON value of
+              Success (expectedValue :: T.Text) -> 
+                S.BELit $ sessionValue /= expectedValue
+              _ -> S.BELit False
+          SVOContains ->
+            case fromJSON value of
+              Success (expectedValue :: T.Text) -> 
+                S.BELit $ expectedValue `T.isInfixOf` sessionValue
+              _ -> S.BELit False
+          SVOIn ->
+            case fromJSON value of
+              Success (expectedList :: [T.Text]) -> 
+                S.BELit $ sessionValue `elem` expectedList
+              _ -> S.BELit False
   BoolField boolExp -> case boolExp of
     AVColumn colInfo redactionExp opExps -> do
       BoolExpCtx {rootReference, currTableReference} <- ask
