@@ -47,7 +47,8 @@ export type PermissionType =
   | 'relationship'
   | 'object'
   | 'value'
-  | 'comparator';
+  | 'comparator'
+  | 'sessionVar';
 
 export type RowPermissionsState = {
   operators: Operators;
