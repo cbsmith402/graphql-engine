@@ -9,9 +9,10 @@ module Hasura.Backends.Postgres.Translate.BoolExp
   )
 where
 
-import Data.Aeson (fromJSON, Result(..))
+import Data.Aeson (fromJSON, Result(..), eitherDecodeStrict)
 import Data.HashMap.Strict qualified as HashMap
 import Data.Text qualified as T
+import Data.Text.Encoding (encodeUtf8)
 import Data.Text.Extended (ToTxt, toTxt)
 import Hasura.Authentication.Session (getSessionVariableValue)
 import Hasura.Authentication.User (UserInfo (..))
@@ -155,10 +156,14 @@ translateBoolExp userInfo = \case
                 S.BELit $ sessionValue /= expectedValue
               _ -> S.BELit False
           SVOContains ->
-            case fromJSON value of
-              Success (expectedValue :: T.Text) -> 
-                S.BELit $ expectedValue `T.isInfixOf` sessionValue
-              _ -> S.BELit False
+            -- Parse session variable as JSON array and check if value is in it
+            case eitherDecodeStrict (encodeUtf8 sessionValue) of
+              Right (sessionList :: [T.Text]) ->
+                case fromJSON value of
+                  Success (expectedValue :: T.Text) -> 
+                    S.BELit $ expectedValue `elem` sessionList
+                  _ -> S.BELit False
+              _ -> S.BELit False -- Session var is not a valid JSON array
           SVOIn ->
             case fromJSON value of
               Success (expectedList :: [T.Text]) -> 

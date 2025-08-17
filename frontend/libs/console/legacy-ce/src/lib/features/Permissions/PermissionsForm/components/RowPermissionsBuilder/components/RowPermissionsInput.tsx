@@ -60,7 +60,7 @@ export const RowPermissionsInput = ({
       items: [
         { name: '_seq (equals)', value: '_seq' },
         { name: '_sne (not equals)', value: '_sne' },
-        { name: '_scontains (contains)', value: '_scontains' },
+        { name: '_scontains (value in session list)', value: '_scontains' },
         { name: '_sin (in list)', value: '_sin' },
       ],
     },

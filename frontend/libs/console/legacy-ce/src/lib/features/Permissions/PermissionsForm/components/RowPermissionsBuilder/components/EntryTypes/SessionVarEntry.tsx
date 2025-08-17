@@ -26,8 +26,8 @@ export function SessionVarEntry({
   const operatorLabels: Record<string, string> = {
     '_seq': 'equals',
     '_sne': 'not equals', 
-    '_scontains': 'contains',
-    '_sin': 'in list'
+    '_scontains': 'value in session list',
+    '_sin': 'session in value list'
   };
 
   return (
@@ -62,6 +62,11 @@ export function SessionVarEntry({
           {k === '_sin' && (
             <div className="text-xs text-gray-500 mt-1">
               For multiple values, separate with commas
+            </div>
+          )}
+          {k === '_scontains' && (
+            <div className="text-xs text-gray-500 mt-1">
+              Checks if this value is in the session variable list
             </div>
           )}
         </div>
