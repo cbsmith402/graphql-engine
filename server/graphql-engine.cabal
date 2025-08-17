@@ -1238,6 +1238,8 @@ test-suite graphql-engine-tests
     Hasura.Metadata.DTO.MetadataDTOSpec
     Hasura.QuickCheck.Instances
     Hasura.RQL.DDL.Webhook.TransformSpec
+    Hasura.RQL.IR.BoolExp.SessionVarSpec
+    Hasura.RQL.IR.BoolExp.SessionVarIntegrationSpec
     Hasura.RQL.IR.Generator
     Hasura.RQL.IR.SelectSpec
     Hasura.RQL.MetadataSpec
