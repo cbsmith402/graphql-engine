@@ -478,10 +478,11 @@ processScheduledEvent schemaCache scheduledTriggerMetrics eventId eventHeaders r
             webhookReqBody = J.encode webhookReqBodyJson
             requestTransform = sewpRequestTransform payload
             responseTransform = mkResponseTransform <$> sewpResponseTransform payload
+            webhookSignature = sewpWebhookSignature payload
 
         eitherReqRes <-
           runExceptT
-            $ mkRequest headers httpTimeout webhookReqBody requestTransform (_envVarValue webhookUrl)
+            $ mkRequestWithSignature headers httpTimeout webhookReqBody requestTransform webhookSignature Nothing (_envVarValue webhookUrl)
             >>= \reqDetails -> do
               let request = extractRequest reqDetails
                   tracesPropagator = getOtelTracesPropagator $ scOpenTelemetryConfig schemaCache

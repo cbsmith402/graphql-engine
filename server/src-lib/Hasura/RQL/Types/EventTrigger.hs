@@ -66,6 +66,7 @@ import Hasura.RQL.Types.Common (EnvRecord, InputWebhook, ResolvedWebhook, Source
 import Hasura.RQL.Types.Eventing
 import Hasura.RQL.Types.Headers (HeaderConf (..))
 import Hasura.RQL.Types.Webhook.Transform (MetadataResponseTransform, RequestTransform)
+import Hasura.RQL.Types.Webhook.Signature (WebhookSignature)
 import System.Cron (CronSchedule)
 import Text.Regex.TDFA qualified as TDFA
 
@@ -430,7 +431,8 @@ data EventTriggerConf (b :: BackendType) = EventTriggerConf
     etcRequestTransform :: Maybe RequestTransform,
     etcResponseTransform :: Maybe MetadataResponseTransform,
     etcCleanupConfig :: Maybe AutoTriggerLogCleanupConfig,
-    etcTriggerOnReplication :: TriggerOnReplication
+    etcTriggerOnReplication :: TriggerOnReplication,
+    etcWebhookSignature :: Maybe WebhookSignature
   }
   deriving (Show, Eq, Generic)
 
@@ -457,6 +459,8 @@ instance (Backend b) => HasCodec (EventTriggerConf b) where
         <*> optionalField' "cleanup_config"
       AC..= etcCleanupConfig
         <*> triggerOnReplication
+        <*> optionalField' "webhook_signature"
+      AC..= etcWebhookSignature
     where
       triggerOnReplication = case defaultTriggerOnReplication @b of
         Just (_, defTOR) -> optionalFieldWithOmittedDefault' "trigger_on_replication" defTOR AC..= etcTriggerOnReplication
@@ -477,10 +481,11 @@ instance (Backend b) => FromJSON (EventTriggerConf b) where
       Just (_, dt) -> pure dt
       Nothing -> fail "No default setting for trigger_on_replication is defined for backend type."
     triggerOnReplication <- o .:? "trigger_on_replication" .!= defTOR
-    return $ EventTriggerConf name definition webhook webhookFromEnv retryConf headers requestTransform responseTransform cleanupConfig triggerOnReplication
+    webhookSignature <- o .:? "webhook_signature"
+    return $ EventTriggerConf name definition webhook webhookFromEnv retryConf headers requestTransform responseTransform cleanupConfig triggerOnReplication webhookSignature
 
 instance (Backend b) => ToJSON (EventTriggerConf b) where
-  toJSON (EventTriggerConf name definition webhook webhookFromEnv retryConf headers requestTransform responseTransform cleanupConfig triggerOnReplication) =
+  toJSON (EventTriggerConf name definition webhook webhookFromEnv retryConf headers requestTransform responseTransform cleanupConfig triggerOnReplication webhookSignature) =
     object
       $ [ "name" .= name,
           "definition" .= definition,
@@ -496,7 +501,8 @@ instance (Backend b) => ToJSON (EventTriggerConf b) where
           "trigger_on_replication"
             .=? case defaultTriggerOnReplication @b of
               Just (_, defTOR) -> if triggerOnReplication == defTOR then Nothing else Just triggerOnReplication
-              Nothing -> Just triggerOnReplication
+              Nothing -> Just triggerOnReplication,
+          "webhook_signature" .=? webhookSignature
         ]
 
 updateCleanupConfig :: Maybe AutoTriggerLogCleanupConfig -> EventTriggerConf b -> EventTriggerConf b

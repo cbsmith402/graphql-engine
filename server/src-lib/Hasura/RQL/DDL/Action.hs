@@ -207,7 +207,8 @@ resolveAction env AnnotatedCustomTypes {..} ActionDefinition {..} allScalars = d
         _adTimeout
         webhookEnvRecord
         _adRequestTransform
-        _adResponseTransform,
+        _adResponseTransform
+        _adWebhookSignature,
       outputObject
     )
 

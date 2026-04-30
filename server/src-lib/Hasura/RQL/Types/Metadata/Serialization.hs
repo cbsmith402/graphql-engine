@@ -344,7 +344,7 @@ sourcesToOrdJSONList sources =
               <> catMaybes [maybeCommentToMaybeOrdPair comment]
 
           eventTriggerConfToOrdJSON :: forall b. (Backend b) => EventTriggerConf b -> AO.Value
-          eventTriggerConfToOrdJSON (EventTriggerConf name definition webhook webhookFromEnv retryConf headers reqTransform respTransform cleanupConfig triggerOnReplication) =
+          eventTriggerConfToOrdJSON (EventTriggerConf name definition webhook webhookFromEnv retryConf headers reqTransform respTransform cleanupConfig triggerOnReplication webhookSignature) =
             let triggerOnReplicationMaybe =
                   case defaultTriggerOnReplication @b of
                     Just (_, defTOR) -> if triggerOnReplication == defTOR then Nothing else Just triggerOnReplication
@@ -361,7 +361,8 @@ sourcesToOrdJSONList sources =
                       fmap (("request_transform",) . AO.toOrdered) reqTransform,
                       fmap (("response_transform",) . AO.toOrdered) respTransform,
                       maybeAnyToMaybeOrdPair "cleanup_config" AO.toOrdered cleanupConfig,
-                      maybeAnyToMaybeOrdPair "trigger_on_replication" AO.toOrdered triggerOnReplicationMaybe
+                      maybeAnyToMaybeOrdPair "trigger_on_replication" AO.toOrdered triggerOnReplicationMaybe,
+                      fmap (("webhook_signature",) . AO.toOrdered) webhookSignature
                     ]
 
     functionMetadataToOrdJSON :: (Backend b) => FunctionMetadata b -> AO.Value
@@ -483,7 +484,7 @@ cronTriggersToOrdJSONList = listToMaybeArraySort crontriggerQToOrdJSON ctName
   where
     crontriggerQToOrdJSON :: CronTriggerMetadata -> AO.Value
     crontriggerQToOrdJSON
-      (CronTriggerMetadata name webhook schedule payload retryConf headers includeInMetadata comment reqTransform respTransform) =
+      (CronTriggerMetadata name webhook schedule payload retryConf headers includeInMetadata comment reqTransform respTransform webhookSignature) =
         AO.object
           $ [ ("name", AO.toOrdered name),
               ("webhook", AO.toOrdered webhook),
@@ -496,7 +497,8 @@ cronTriggersToOrdJSONList = listToMaybeArraySort crontriggerQToOrdJSON ctName
               maybeAnyToMaybeOrdPair "headers" AO.toOrdered (maybeHeader headers),
               maybeAnyToMaybeOrdPair "comment" AO.toOrdered comment,
               fmap (("request_transform",) . AO.toOrdered) reqTransform,
-              fmap (("response_transform",) . AO.toOrdered) respTransform
+              fmap (("response_transform",) . AO.toOrdered) respTransform,
+              fmap (("webhook_signature",) . AO.toOrdered) webhookSignature
             ]
         where
           maybeRetryConfiguration retryConfig
@@ -619,6 +621,7 @@ actionMetadataToOrdJSONList = listToMaybeArraySort actionMetadataToOrdJSON _amNa
               handler
               requestTransform
               responseTransform
+              webhookSignature
             ) =
             let typeAndKind = case actionType of
                   ActionQuery -> [("type", AO.toOrdered ("query" :: String))]
@@ -636,7 +639,8 @@ actionMetadataToOrdJSONList = listToMaybeArraySort actionMetadataToOrdJSON _amNa
                     [ listToMaybeOrdPair "headers" AO.toOrdered headers,
                       listToMaybeOrdPair "arguments" argDefinitionToOrdJSON args,
                       fmap (("request_transform",) . AO.toOrdered) requestTransform,
-                      fmap (("response_transform",) . AO.toOrdered) responseTransform
+                      fmap (("response_transform",) . AO.toOrdered) responseTransform,
+                      fmap (("webhook_signature",) . AO.toOrdered) webhookSignature
                     ]
                   <> typeAndKind
                   <> bool [("timeout", AO.toOrdered timeout)] mempty (timeout == defaultActionTimeoutSecs)

@@ -36,6 +36,8 @@ module Hasura.Eventing.HTTP
     invocationVersionET,
     invocationVersionST,
     mkRequest,
+    mkRequestWithSignature,
+    addSignatureHeader,
     invokeRequest,
     TransformableRequestError (..),
   )
@@ -71,6 +73,7 @@ import Hasura.RQL.Types.Common (ResolvedWebhook (..))
 import Hasura.RQL.Types.EventTrigger
 import Hasura.RQL.Types.Eventing
 import Hasura.RQL.Types.Headers
+import Hasura.RQL.Types.Webhook.Signature (WebhookSignature, generateSignature, isSignatureEnabled, signatureHeaderName)
 import Hasura.Server.Types (TriggersErrorLogLevelStatus, isTriggersErrorLogLevelEnabled)
 import Hasura.Tracing
 import Network.HTTP.Client.Transformable qualified as HTTP
@@ -361,6 +364,31 @@ mkRequest headers timeout payload mRequestTransform (ResolvedWebhook webhook) =
                         Right transformedReq ->
                           let transformedReqSize = HTTP.getReqSize transformedReq
                            in pure $ RequestDetails req (LBS.length payload) (Just transformedReq) (Just transformedReqSize) (Just $ requestContext req) sessionVars
+
+-- | Add HMAC signature header to a list of headers
+addSignatureHeader :: Maybe WebhookSignature -> Maybe Text -> LBS.ByteString -> [HTTP.Header] -> [HTTP.Header]
+addSignatureHeader mSignature mSecret payload headers =
+  case (mSignature, mSecret) of
+    (Just sig, Just secret) | isSignatureEnabled sig ->
+      let signature = generateSignature secret (LBS.toStrict payload)
+          signatureHeader = (CI.mk (TE.encodeUtf8 signatureHeaderName), TE.encodeUtf8 signature)
+       in signatureHeader : headers
+    _ -> headers
+
+-- | Version of mkRequest that supports webhook signatures
+mkRequestWithSignature ::
+  (MonadError (TransformableRequestError a) m) =>
+  [HTTP.Header] ->
+  HTTP.ResponseTimeout ->
+  LBS.ByteString ->
+  Maybe Transform.RequestTransform ->
+  Maybe WebhookSignature ->
+  Maybe Text ->  -- ^ Webhook secret
+  ResolvedWebhook ->
+  m RequestDetails
+mkRequestWithSignature headers timeout payload mRequestTransform mSignature mSecret webhook =
+  let headersWithSignature = addSignatureHeader mSignature mSecret payload headers
+   in mkRequest headersWithSignature timeout payload mRequestTransform webhook
 
 invokeRequest ::
   ( MonadReader r m,

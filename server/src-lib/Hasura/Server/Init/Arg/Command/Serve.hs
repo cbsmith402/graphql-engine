@@ -77,6 +77,7 @@ module Hasura.Server.Init.Arg.Command.Serve
     traceQueryStatusOption,
     serverTimeoutOption,
     logMaskedVariablesOption,
+    webhookSecretOption,
 
     -- * Pretty Printer
     serveCmdFooter,
@@ -181,6 +182,7 @@ serveCommandParser =
     <*> parsePreserve401Errors
     <*> parseServerTimeout
     <*> parseLogMaskedVariables
+    <*> parseWebhookSecret
 
 --------------------------------------------------------------------------------
 -- Serve Options
@@ -1470,6 +1472,23 @@ logMaskedVariablesOption =
           <> "replaced with \"[MASKED]\" in query-log output."
     }
 
+parseWebhookSecret :: Opt.Parser (Maybe Text)
+parseWebhookSecret =
+  Opt.optional
+    $ Opt.strOption
+      ( Opt.long "webhook-secret"
+          <> Opt.metavar "<SECRET>"
+          <> Opt.help (Config._helpMessage webhookSecretOption)
+      )
+
+webhookSecretOption :: Config.Option ()
+webhookSecretOption =
+  Config.Option
+    { Config._default = (),
+      Config._envVar = "HASURA_GRAPHQL_WEBHOOK_SECRET",
+      Config._helpMessage = "Secret key for signing webhook requests with HMAC-SHA256. Enables webhook signature verification when set."
+    }
+
 --------------------------------------------------------------------------------
 -- Pretty Printer
 
@@ -1579,6 +1598,7 @@ serveCmdFooter =
         Config.optionPP configuredHeaderPrecedenceOption,
         Config.optionPP preserve401ErrorsOption,
         Config.optionPP serverTimeoutOption,
-        Config.optionPP logMaskedVariablesOption
+        Config.optionPP logMaskedVariablesOption,
+        Config.optionPP webhookSecretOption
       ]
     eventEnvs = [Config.optionPP graphqlEventsHttpPoolSizeOption, Config.optionPP graphqlEventsFetchIntervalOption]
