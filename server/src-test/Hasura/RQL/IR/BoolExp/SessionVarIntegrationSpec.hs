@@ -5,7 +5,7 @@
 module Hasura.RQL.IR.BoolExp.SessionVarIntegrationSpec (spec) where
 
 import Data.Aeson (Value (..), fromJSON, toJSON, Result(..))
-import Data.Aeson qualified as A
+import Data.Aeson qualified as J
 import Data.Aeson.QQ (aesonQQ)
 import Data.Text (Text) -- Used for type annotations
 import Hasura.Prelude
@@ -79,4 +79,4 @@ spec = do
         
         case result of
           Success roundTripBoolExp -> roundTripBoolExp `shouldBe` originalBoolExp
-          A.Error err -> expectationFailure $ "Round-trip failed: " <> err
+          J.Error err -> expectationFailure $ "Round-trip failed: " <> err

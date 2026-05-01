@@ -1,10 +1,8 @@
-{-# LANGUAGE StandaloneDeriving #-}
-
 -- | Property-based tests for session variable operators using QuickCheck.
 module Hasura.RQL.IR.BoolExp.SessionVarPropertySpec (spec) where
 
 import Data.Aeson (Value (..), Array, toJSON, fromJSON)
-import Data.Aeson qualified as A
+import Data.Aeson qualified as J
 import Data.List (nub)
 import Data.Text (Text)
 import Hasura.Prelude
@@ -48,10 +46,10 @@ spec = do
       it "JSON serialization is reversible" $ property $ \(condition :: SessionVarCondition) ->
         let boolExp = BoolSessionVar condition :: GBoolExp PG ColExp
             json = toJSON boolExp
-            result = fromJSON json :: A.Result (GBoolExp PG ColExp)
+            result = fromJSON json :: J.Result (GBoolExp PG ColExp)
         in case result of
-             A.Success parsed -> parsed === boolExp
-             A.Error _ -> property False
+             J.Success parsed -> parsed === boolExp
+             J.Error _ -> property False
 
     describe "SessionVarCondition Properties" $ do
       it "Eq instance is reflexive" $ property $ \(condition :: SessionVarCondition) ->
