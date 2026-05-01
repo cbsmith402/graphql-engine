@@ -41,7 +41,6 @@ module Hasura.RQL.Types.ScheduledTrigger
     cctReplace,
     cctRequestTransform,
     cctResponseTransform,
-    cctWebhookSignature,
   )
 where
 
@@ -64,7 +63,6 @@ import Hasura.RQL.Types.Common (InputWebhook (..))
 import Hasura.RQL.Types.EventTrigger
 import Hasura.RQL.Types.Eventing
 import Hasura.RQL.Types.Webhook.Transform (MetadataResponseTransform, RequestTransform)
-import Hasura.RQL.Types.Webhook.Signature (WebhookSignature)
 import PostgreSQL.Binary.Decoding qualified as PD
 import Refined (NonNegative, Refined, refineTH)
 import System.Cron.Types
@@ -147,8 +145,7 @@ data CronTriggerMetadata = CronTriggerMetadata
     ctIncludeInMetadata :: Bool,
     ctComment :: Maybe Text,
     ctRequestTransform :: Maybe RequestTransform,
-    ctResponseTransform :: Maybe MetadataResponseTransform,
-    ctWebhookSignature :: Maybe WebhookSignature
+    ctResponseTransform :: Maybe MetadataResponseTransform
   }
   deriving (Show, Eq, Generic)
 
@@ -178,8 +175,6 @@ instance HasCodec CronTriggerMetadata where
       AC..= ctRequestTransform
         <*> optionalField' "response_transform"
       AC..= ctResponseTransform
-        <*> optionalField' "webhook_signature"
-      AC..= ctWebhookSignature
 
 instance FromJSON CronTriggerMetadata where
   parseJSON =
@@ -194,7 +189,6 @@ instance FromJSON CronTriggerMetadata where
       ctComment <- o .:? "comment"
       ctRequestTransform <- o .:? "request_transform"
       ctResponseTransform <- o .:? "response_transform"
-      ctWebhookSignature <- o .:? "webhook_signature"
       pure CronTriggerMetadata {..}
 
 instance ToJSON CronTriggerMetadata where
@@ -212,8 +206,7 @@ data CreateCronTrigger = CreateCronTrigger
     _cctComment :: Maybe Text,
     _cctReplace :: Bool,
     _cctRequestTransform :: Maybe RequestTransform,
-    _cctResponseTransform :: Maybe MetadataResponseTransform,
-    _cctWebhookSignature :: Maybe WebhookSignature
+    _cctResponseTransform :: Maybe MetadataResponseTransform
   }
   deriving (Show, Eq, Generic)
 
@@ -235,7 +228,6 @@ instance FromJSON CreateCronTrigger where
       _cctReplace <- o .:? "replace" .!= False
       _cctRequestTransform <- o .:? "request_transform"
       _cctResponseTransform <- o .:? "response_transform"
-      _cctWebhookSignature <- o .:? "webhook_signature"
       pure CreateCronTrigger {..}
 
 instance ToJSON CreateCronTrigger where

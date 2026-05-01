@@ -16,9 +16,6 @@ export const schema = z.object({
   tolerance_seconds: z.string(),
   include_in_metadata: z.boolean(),
   comment: z.string(),
-  webhook_signature: z.object({
-    enabled: z.boolean(),
-  }).optional(),
 });
 
 export type Schema = z.infer<typeof schema>;

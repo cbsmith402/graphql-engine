@@ -3,7 +3,6 @@ import { RequestHeadersSelector } from '../../../../../new-components/RequestHea
 import { IconTooltip } from '../../../../../new-components/Tooltip';
 import { Collapsible } from '../../../../../new-components/Collapsible';
 import { IncludeInMetadataSwitch } from './IncludeInMetadataSwitch';
-import { WebhookSignatureSwitch } from './WebhookSignatureSwitch';
 import { RetryConfiguration } from './RetryConfiguration';
 
 export const AdvancedSettings = () => {
@@ -35,10 +34,6 @@ export const AdvancedSettings = () => {
             Retry Configuration
           </h4>
           <RetryConfiguration />
-        </div>
-        <hr className="my-md" />
-        <div className="mb-xs">
-          <WebhookSignatureSwitch />
         </div>
         <hr className="my-md" />
         <div className="mb-xs">

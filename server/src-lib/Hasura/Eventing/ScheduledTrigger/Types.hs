@@ -4,7 +4,7 @@ module Hasura.Eventing.ScheduledTrigger.Types
     FetchedCronTriggerStatsLogger,
     RetryContext (RetryContext, _rctxConf),
     ScheduledEventOp (..),
-    ScheduledEventWebhookPayload (ScheduledEventWebhookPayload, sewpName, sewpScheduledTime, sewpRequestTransform, sewpResponseTransform, sewpWebhookSignature),
+    ScheduledEventWebhookPayload (ScheduledEventWebhookPayload, sewpName, sewpScheduledTime, sewpRequestTransform, sewpResponseTransform),
     ScheduledTriggerInternalErr (ScheduledTriggerInternalErr),
     CronEventsCount (..),
     OneOffScheduledEventsCount (..),
@@ -23,7 +23,6 @@ import Hasura.Prelude
 import Hasura.RQL.DDL.Webhook.Transform (MetadataResponseTransform, RequestTransform)
 import Hasura.RQL.Types.EventTrigger
 import Hasura.RQL.Types.ScheduledTrigger
-import Hasura.RQL.Types.Webhook.Signature (WebhookSignature)
 
 newtype ScheduledTriggerInternalErr
   = ScheduledTriggerInternalErr QErr
@@ -87,8 +86,7 @@ data ScheduledEventWebhookPayload = ScheduledEventWebhookPayload
     -- don't send it
     sewpCreatedAt :: !(Maybe UTCTime),
     sewpRequestTransform :: !(Maybe RequestTransform),
-    sewpResponseTransform :: !(Maybe MetadataResponseTransform),
-    sewpWebhookSignature :: !(Maybe WebhookSignature)
+    sewpResponseTransform :: !(Maybe MetadataResponseTransform)
   }
   deriving (Show, Generic, Eq)
 

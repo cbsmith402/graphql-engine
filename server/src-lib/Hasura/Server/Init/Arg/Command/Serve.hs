@@ -1,5 +1,11 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# OPTIONS_GHC -Wno-deprecations #-}
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+
+-- TemplateHaskell is required for the typed-TH splices (`$$(refineTH ...)`)
+-- used throughout this file. hlint doesn't recognize typed splices as a
+-- usage of the extension and will report it as unused.
+{-# HLINT ignore "Unused LANGUAGE pragma" #-}
 
 -- | The Arg Opt.Parser for the 'serve' subcommand.
 module Hasura.Server.Init.Arg.Command.Serve
@@ -173,6 +179,7 @@ serveCommandParser =
     <*> parseMaxTotalHeaderLength
     <*> parseTriggersErrorLoglevelStatus
     <*> parseAsyncActionsFetchBatchSize
+    <*> parseWebhookSecret
     <*> parsePersistedQueries
     <*> parsePersistedQueriesTtl
     <*> parseRemoteSchemaResponsePriority
@@ -182,7 +189,6 @@ serveCommandParser =
     <*> parsePreserve401Errors
     <*> parseServerTimeout
     <*> parseLogMaskedVariables
-    <*> parseWebhookSecret
 
 --------------------------------------------------------------------------------
 -- Serve Options

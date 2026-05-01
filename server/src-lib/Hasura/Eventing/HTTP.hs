@@ -37,14 +37,13 @@ module Hasura.Eventing.HTTP
     invocationVersionST,
     mkRequest,
     mkRequestWithSignature,
-    addSignatureHeader,
     invokeRequest,
     TransformableRequestError (..),
   )
 where
 
 import Control.Exception (try)
-import Control.Lens (preview, set, (.~))
+import Control.Lens (preview, set, view, (.~))
 import Data.Aeson qualified as J
 import Data.Aeson.Encoding qualified as JE
 import Data.Aeson.Key qualified as J
@@ -73,7 +72,7 @@ import Hasura.RQL.Types.Common (ResolvedWebhook (..))
 import Hasura.RQL.Types.EventTrigger
 import Hasura.RQL.Types.Eventing
 import Hasura.RQL.Types.Headers
-import Hasura.RQL.Types.Webhook.Signature (WebhookSignature, generateSignature, isSignatureEnabled, signatureHeaderName)
+import Hasura.RQL.Types.Webhook.Signature (generateSignature, signatureHeaderName)
 import Hasura.Server.Types (TriggersErrorLogLevelStatus, isTriggersErrorLogLevelEnabled)
 import Hasura.Tracing
 import Network.HTTP.Client.Transformable qualified as HTTP
@@ -365,30 +364,42 @@ mkRequest headers timeout payload mRequestTransform (ResolvedWebhook webhook) =
                           let transformedReqSize = HTTP.getReqSize transformedReq
                            in pure $ RequestDetails req (LBS.length payload) (Just transformedReq) (Just transformedReqSize) (Just $ requestContext req) sessionVars
 
--- | Add HMAC signature header to a list of headers
-addSignatureHeader :: Maybe WebhookSignature -> Maybe Text -> LBS.ByteString -> [HTTP.Header] -> [HTTP.Header]
-addSignatureHeader mSignature mSecret payload headers =
-  case (mSignature, mSecret) of
-    (Just sig, Just secret) | isSignatureEnabled sig ->
-      let signature = generateSignature secret (LBS.toStrict payload)
-          signatureHeader = (CI.mk (TE.encodeUtf8 signatureHeaderName), TE.encodeUtf8 signature)
-       in signatureHeader : headers
-    _ -> headers
-
--- | Version of mkRequest that supports webhook signatures
+-- | Build a request and, if a webhook secret is configured, attach an HMAC
+-- signature header. Signing is global: whenever a secret is set, every
+-- request goes out signed. The signature is computed over the post-transform
+-- body, so receivers verifying the signature against the bytes they actually
+-- received will succeed even when a request transform rewrites the body.
 mkRequestWithSignature ::
   (MonadError (TransformableRequestError a) m) =>
   [HTTP.Header] ->
   HTTP.ResponseTimeout ->
   LBS.ByteString ->
   Maybe Transform.RequestTransform ->
-  Maybe WebhookSignature ->
-  Maybe Text ->  -- ^ Webhook secret
+  -- | Webhook secret, when configured.
+  Maybe Text ->
   ResolvedWebhook ->
   m RequestDetails
-mkRequestWithSignature headers timeout payload mRequestTransform mSignature mSecret webhook =
-  let headersWithSignature = addSignatureHeader mSignature mSecret payload headers
-   in mkRequest headersWithSignature timeout payload mRequestTransform webhook
+mkRequestWithSignature headers timeout payload mRequestTransform mSecret webhook = do
+  reqDetails <- mkRequest headers timeout payload mRequestTransform webhook
+  case mSecret of
+    Nothing -> pure reqDetails
+    Just secret ->
+      let finalReq = extractRequest reqDetails
+          finalBody = fromMaybe LBS.empty $ preview (HTTP.body . HTTP._RequestBodyLBS) finalReq
+          signature = generateSignature secret (LBS.toStrict finalBody)
+          sigHeader = (CI.mk (TE.encodeUtf8 signatureHeaderName), TE.encodeUtf8 signature)
+          signedReq = set HTTP.headers (sigHeader : view HTTP.headers finalReq) finalReq
+       in pure $ case _rdTransformedRequest reqDetails of
+            Just _ ->
+              reqDetails
+                { _rdTransformedRequest = Just signedReq,
+                  _rdTransformedSize = Just (HTTP.getReqSize signedReq)
+                }
+            Nothing ->
+              reqDetails
+                { _rdOriginalRequest = signedReq,
+                  _rdOriginalSize = HTTP.getReqSize signedReq
+                }
 
 invokeRequest ::
   ( MonadReader r m,

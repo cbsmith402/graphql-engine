@@ -26,7 +26,6 @@ module Hasura.RQL.Types.Action
     adTimeout,
     adRequestTransform,
     adResponseTransform,
-    adWebhookSignature,
     ActionType (..),
     ActionMutationKind (..),
 
@@ -81,7 +80,6 @@ import Hasura.RQL.Types.CustomTypes
 import Hasura.RQL.Types.Eventing (EventId (..))
 import Hasura.RQL.Types.Headers
 import Hasura.RQL.Types.Webhook.Transform (MetadataResponseTransform, RequestTransform)
-import Hasura.RQL.Types.Webhook.Signature (WebhookSignature)
 import Language.GraphQL.Draft.Syntax qualified as G
 import Network.HTTP.Types qualified as HTTP
 import PostgreSQL.Binary.Encoding qualified as PE
@@ -171,8 +169,7 @@ data ActionDefinition arg webhook = ActionDefinition
     _adTimeout :: Timeout,
     _adHandler :: webhook,
     _adRequestTransform :: Maybe RequestTransform,
-    _adResponseTransform :: Maybe MetadataResponseTransform,
-    _adWebhookSignature :: Maybe WebhookSignature
+    _adResponseTransform :: Maybe MetadataResponseTransform
   }
   deriving (Show, Eq, Functor, Foldable, Traversable, Generic)
 
@@ -210,8 +207,6 @@ instance
           AC..= _adRequestTransform
             <*> optionalField' "response_transform"
           AC..= _adResponseTransform
-            <*> optionalField' "webhook_signature"
-          AC..= _adWebhookSignature
 
       typeAndKind :: (ActionMutationKind -> ActionType) -> AC.ObjectCodec ActionType ActionType
       typeAndKind actionTypeConstructor = case (actionTypeConstructor ActionSynchronous) of
@@ -413,7 +408,6 @@ instance (J.FromJSON a, J.FromJSON b) => J.FromJSON (ActionDefinition a b) where
       t -> fail $ "expected mutation or query, but found " <> t
     _adRequestTransform <- o .:? "request_transform"
     _adResponseTransform <- o .:? "response_transform"
-    _adWebhookSignature <- o .:? "webhook_signature"
     pure ActionDefinition {..}
 
 instance J.FromJSON ActionMetadata where
@@ -447,8 +441,7 @@ instance (J.ToJSON a, J.ToJSON b) => J.ToJSON (ActionDefinition a b) where
             ]
           <> catMaybes
             [ ("request_transform" .=) <$> _adRequestTransform,
-              ("response_transform" .=) <$> _adResponseTransform,
-              ("webhook_signature" .=) <$> _adWebhookSignature
+              ("response_transform" .=) <$> _adResponseTransform
             ]
           <> typeAndKind
 
