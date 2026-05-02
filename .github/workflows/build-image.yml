@@ -326,8 +326,24 @@ jobs:
           REF: ${{ github.ref }}
         run: |
           short=$(git rev-parse --short HEAD)
+          # Sanitize the branch name into a valid OCI tag:
+          #   1. lowercase
+          #   2. replace anything outside [a-z0-9._-] with '-'
+          #   3. collapse repeated '-'
+          #   4. strip leading/trailing '.' and '-'
+          #   5. truncate to 128 chars
+          # Same rule docker/metadata-action applies. Avoids "invalid reference
+          # format" failures when branches contain '/' or other characters.
+          ref_tag=$(printf '%s' "$REF_NAME" \
+            | tr '[:upper:]' '[:lower:]' \
+            | sed -E -e 's/[^a-z0-9._-]+/-/g' -e 's/-+/-/g' -e 's/^[.-]+//' -e 's/[.-]+$//' \
+            | cut -c1-128)
+          # Defensive: if sanitization stripped everything, fall back to the SHA.
+          if [ -z "$ref_tag" ]; then
+            ref_tag="sha-$short"
+          fi
           tags=()
-          tags+=("${{ env.REGISTRY }}/${{ env.IMAGE }}:$REF_NAME")
+          tags+=("${{ env.REGISTRY }}/${{ env.IMAGE }}:$ref_tag")
           tags+=("${{ env.REGISTRY }}/${{ env.IMAGE }}:sha-$short")
           if [ "$REF" = "refs/heads/master" ]; then
             tags+=("${{ env.REGISTRY }}/${{ env.IMAGE }}:latest")
