@@ -10,6 +10,7 @@ import Control.Lens
 import Control.Monad.Trans.Control (MonadBaseControl)
 import Data.Aeson
 import Data.Aeson qualified as J
+import Data.Aeson.KeyMap qualified as KM
 import Data.ByteString.Lazy qualified as BL
 import Data.HashMap.Strict qualified as HashMap
 import Data.Parser.CacheControl (parseMaxAge)
@@ -140,7 +141,8 @@ mkUserInfoFromResp (Logger logger) url method statusCode respBody respHdrs
         Right rawHeaders -> getUserInfoFromHdrs rawHeaders respHdrs
   | statusCode == HTTP.status401 = do
       logError
-      throw401 "Authentication hook unauthorized this request"
+      let (code, message) = parse401Body respBody
+      throwError $ err401 code message
   | otherwise = do
       logError
       throw500 "Invalid response from authorization hook"
@@ -174,3 +176,22 @@ mkUserInfoFromResp (Logger logger) url method statusCode respBody respHdrs
     timeFromExpires headers = do
       header <- afold $ HashMap.lookup "Expires" headers
       parseExpirationTime header `onLeft` \err -> logWarn (T.pack err) *> empty
+
+-- | Parse an auth-webhook 401 response body for an optional custom code and
+-- message. The webhook may return JSON like @{"code": "...", "message": "..."}@
+-- (or @"error"@ in place of @"message"@) to surface a specific reason to the
+-- caller. Anything missing or malformed falls back to historical defaults.
+parse401Body :: BL.ByteString -> (Code, Text)
+parse401Body body =
+  let parsed = decode body :: Maybe Value
+      lookupStr k = parsed >>= \case
+        Object o -> case KM.lookup k o of
+          Just (String s) -> Just s
+          _ -> Nothing
+        _ -> Nothing
+      code = maybe AccessDenied CustomCode (lookupStr "code")
+      message =
+        fromMaybe
+          "Authentication hook unauthorized this request"
+          (lookupStr "message" <|> lookupStr "error")
+   in (code, message)
