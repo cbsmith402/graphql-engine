@@ -32,6 +32,25 @@ export const boolOperatorsInfo = {
   },
 };
 
+export const sessionVarOperatorsInfo = {
+  _seq: {
+    type: 'sessionVar',
+    inputStructure: 'object',
+  },
+  _sne: {
+    type: 'sessionVar',
+    inputStructure: 'object',
+  },
+  _scontains: {
+    type: 'sessionVar',
+    inputStructure: 'object',
+  },
+  _sin: {
+    type: 'sessionVar',
+    inputStructure: 'object',
+  },
+};
+
 export const columnOperatorsInfo = {
   _eq: {
     type: 'comparision',
@@ -236,10 +255,13 @@ export const boolOperators = Object.keys(boolOperatorsInfo);
 
 const columnOperators = Object.keys(columnOperatorsInfo);
 
+export const sessionVarOperators = Object.keys(sessionVarOperatorsInfo);
+
 export const existOperators = ['_exists'];
 
 export const allOperators = boolOperators
   .concat(columnOperators)
+  .concat(sessionVarOperators)
   .concat(existOperators);
 
 export const TABLE_KEY = '_table';
@@ -255,6 +277,10 @@ export const isBoolOperator = operator => {
 
 export const isExistOperator = operator => {
   return existOperators.includes(operator);
+};
+
+export const isSessionVarOperator = operator => {
+  return sessionVarOperators.includes(operator);
 };
 
 export const isArrayBoolOperator = operator => {

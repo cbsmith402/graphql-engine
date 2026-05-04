@@ -12,6 +12,8 @@ module Hasura.RQL.IR.BoolExp
     GBoolExp (..),
     gBoolExpTrue,
     GExists (..),
+    SessionVarCondition (..),
+    SessionVarOperator (..),
     DWithinGeomOp (..),
     DWithinGeogOp (..),
     CastExp,
@@ -71,6 +73,46 @@ import Hasura.RQL.Types.Relationships.Local
 import Hasura.SQL.AnyBackend qualified as AB
 
 ----------------------------------------------------------------------------------------------------
+-- Session Variable Conditions
+
+-- | Represents a condition on a session variable. This allows checking session variables
+-- directly in boolean expressions as peers to _and, _or, _not, _exists.
+data SessionVarCondition = SessionVarCondition
+  { svcOperator :: SessionVarOperator,
+    svcVariable :: SessionVariable,
+    svcValue :: Value
+  }
+  deriving (Show, Eq, Generic, Data)
+
+instance NFData SessionVarCondition
+
+instance Hashable SessionVarCondition
+
+-- | Session variable operators for direct comparison
+data SessionVarOperator
+  = SVOEquals -- _seq
+  | SVONotEquals -- _sne  
+  | SVOContains -- _scontains
+  | SVOIn -- _sin
+  deriving (Show, Eq, Generic, Data)
+
+instance NFData SessionVarOperator
+
+instance Hashable SessionVarOperator
+
+instance FromJSON SessionVarCondition where
+  parseJSON = withObject "SessionVarCondition" $ \o -> do
+    var <- o .: "var"
+    value <- o .: "value"
+    -- The operator is determined by the parent key (_seq, _sne, etc.)
+    -- This will be handled in the parent parsing context
+    pure $ SessionVarCondition SVOEquals var value
+
+instance ToJSON SessionVarCondition where
+  toJSON (SessionVarCondition _op var value) =
+    object ["var" .= var, "value" .= value]
+
+----------------------------------------------------------------------------------------------------
 -- Boolean structure
 
 -- | This type represents a boolean expression tree. It is parametric over the actual
@@ -88,6 +130,8 @@ data GBoolExp (backend :: BackendType) field
     -- since the @backend@ and @field@ are the same,
     -- the table must be of the same database type.
     BoolExists (GExists backend field)
+  | -- | A session variable condition
+    BoolSessionVar SessionVarCondition
   | -- | A column field
     BoolField field
   deriving (Show, Functor, Foldable, Traversable, Data, Generic)
@@ -101,8 +145,12 @@ instance (Backend b, Data a) => Plated (GBoolExp b a)
 instance (Backend b, Hashable a) => Hashable (GBoolExp b a)
 
 instance (Backend b, FromJSONKeyValue a) => FromJSON (GBoolExp b a) where
-  parseJSON = withObject "boolean expression" \o ->
-    BoolAnd <$> forM (KM.toList o) \(k, v) ->
+  parseJSON = withObject "boolean expression" $ \o -> do
+    let parseSessionVarCondition op = withObject "session variable condition" $ \obj -> do
+          var <- obj .: "var"
+          value <- obj .: "value"
+          pure $ SessionVarCondition op var value
+    BoolAnd <$> forM (KM.toList o) (\(k, v) ->
       if
         | k == "$or" -> BoolOr <$> parseJSON v <?> Key k
         | k == "_or" -> BoolOr <$> parseJSON v <?> Key k
@@ -112,7 +160,11 @@ instance (Backend b, FromJSONKeyValue a) => FromJSON (GBoolExp b a) where
         | k == "_not" -> BoolNot <$> parseJSON v <?> Key k
         | k == "$exists" -> BoolExists <$> parseJSON v <?> Key k
         | k == "_exists" -> BoolExists <$> parseJSON v <?> Key k
-        | otherwise -> BoolField <$> parseJSONKeyValue (k, v)
+        | k == "_seq" -> BoolSessionVar <$> parseSessionVarCondition SVOEquals v <?> Key k
+        | k == "_sne" -> BoolSessionVar <$> parseSessionVarCondition SVONotEquals v <?> Key k
+        | k == "_scontains" -> BoolSessionVar <$> parseSessionVarCondition SVOContains v <?> Key k
+        | k == "_sin" -> BoolSessionVar <$> parseSessionVarCondition SVOIn v <?> Key k
+        | otherwise -> BoolField <$> parseJSONKeyValue (k, v))
 
 instance (Backend backend, ToJSONKeyValue field) => ToJSON (GBoolExp backend field) where
   -- A representation for boolean values as JSON.
@@ -135,7 +187,17 @@ instance (Backend backend, ToJSONKeyValue field) => ToJSON (GBoolExp backend fie
         BoolOr bExps -> "_or" .= map toJSON bExps
         BoolNot bExp -> "_not" .= toJSON bExp
         BoolExists bExists -> "_exists" .= toJSON bExists
+        BoolSessionVar sessionCond -> sessionVarConditionToJSON sessionCond
         BoolField a -> toJSONKeyValue a
+      
+      sessionVarConditionToJSON :: SessionVarCondition -> (Key, Value)
+      sessionVarConditionToJSON (SessionVarCondition op var value) =
+        let opKey = case op of
+              SVOEquals -> "_seq"
+              SVONotEquals -> "_sne" 
+              SVOContains -> "_scontains"
+              SVOIn -> "_sin"
+        in opKey .= object ["var" .= var, "value" .= value]
 
 -- | A default representation for a @true@ boolean value.
 gBoolExpTrue :: GBoolExp backend field

@@ -488,6 +488,9 @@ updateFieldInBoolExp qt rf be =
           . GExists refqt
           . unBoolExp
           <$> updateFieldInBoolExp refqt rf (BoolExp wh)
+      BoolSessionVar sessionVarCondition ->
+        -- Session variable conditions don't need field renaming
+        pure $ BoolSessionVar sessionVarCondition
       BoolField fld -> BoolField <$> updateColExp qt rf fld
   where
     procExps = mapM updateBoolExp'

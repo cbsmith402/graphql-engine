@@ -28,6 +28,7 @@ import {
   boolOperators,
   deprecatedColumnOperators,
   existOperators,
+  sessionVarOperators,
   getOperatorInputType,
   getPermissionOperators,
   getRootType,
@@ -36,6 +37,7 @@ import {
   isBoolOperator,
   isColumnOperator,
   isExistOperator,
+  isSessionVarOperator,
   TABLE_KEY,
   WHERE_KEY,
 } from './utils';
@@ -134,6 +136,8 @@ class PermissionBuilder extends React.Component<PermissionBuilderProps> {
           existTableDef as QualifiedTable,
           JSON.stringify(existWhere)
         );
+      } else if (isSessionVarOperator(operator)) {
+        // no missing schemas for session variable operators
       } else if (isColumnOperator(operator)) {
         // no missing schemas
       } else {
@@ -321,6 +325,37 @@ class PermissionBuilder extends React.Component<PermissionBuilderProps> {
         return filter;
       };
 
+      const getSessionVarOperatorFilter = (
+        operator: string,
+        opValue: any,
+        opConditions: Record<string, any>,
+        opPrefix: string,
+        isLast: boolean
+      ) => {
+        const filter: Record<string, any> = {
+          [operator]: opConditions,
+        };
+
+        if (isLast) {
+          filter[operator] = {
+            var: '',
+            value: '',
+          };
+        } else if (opPrefix === 'var') {
+          filter[operator] = {
+            var: opValue,
+            value: opConditions?.value || '',
+          };
+        } else if (opPrefix === 'value') {
+          filter[operator] = {
+            var: opConditions?.var || '',
+            value: opValue,
+          };
+        }
+
+        return filter;
+      };
+
       const getColumnFilter = (
         operator: string,
         opValue: string,
@@ -383,6 +418,14 @@ class PermissionBuilder extends React.Component<PermissionBuilderProps> {
         boolExp = getColumnOperatorFilter(operator, value);
       } else if (isExistOperator(operator)) {
         boolExp = getExistsOperatorFilter(
+          operator,
+          value,
+          opConditions,
+          newPrefix,
+          isLast
+        );
+      } else if (isSessionVarOperator(operator)) {
+        boolExp = getSessionVarOperatorFilter(
           operator,
           value,
           opConditions,
@@ -966,6 +1009,44 @@ class PermissionBuilder extends React.Component<PermissionBuilderProps> {
       return <QueryBuilderJson element={tableExp} />;
     };
 
+    const renderSessionVarExp = (
+      dispatchFunc: (arg0: { prefix: string; value: any }) => void,
+      operation: string,
+      expression: Record<string, any>,
+      prefix: string
+    ) => {
+      const dispatchVarInput = (val: string) => {
+        dispatchFunc({ prefix: addToPrefix(prefix, 'var'), value: val });
+      };
+
+      const dispatchValueInput = (val: string) => {
+        dispatchFunc({ prefix: addToPrefix(prefix, 'value'), value: val });
+      };
+
+      const sessionVar = expression.var || '';
+      const sessionValue = expression.value || '';
+
+      const varInput = renderInput(dispatchVarInput, sessionVar);
+      const valueInput = renderInput(dispatchValueInput, sessionValue);
+
+      const sessionVarArgsJsonObject = {
+        var: varInput,
+        value: valueInput,
+      };
+
+      const unselectedElements = [];
+      if (!sessionVar) {
+        unselectedElements.push('value');
+      }
+
+      return (
+        <QueryBuilderJson
+          element={sessionVarArgsJsonObject}
+          unselectedElements={unselectedElements}
+        />
+      );
+    };
+
     const renderExistsExp = (
       dispatchFunc: (arg0: { prefix: string; value: any }) => void,
       operation: string,
@@ -1108,6 +1189,7 @@ class PermissionBuilder extends React.Component<PermissionBuilderProps> {
       const newOperatorOptions = [
         { optGroupTitle: 'bool operators', options: boolOperators },
         { optGroupTitle: 'exist operators', options: existOperators },
+        { optGroupTitle: 'session variable operators', options: sessionVarOperators },
         { optGroupTitle: 'columns', options: tableColumnNames },
         { optGroupTitle: 'relationships', options: tableRelationshipNames },
         { optGroupTitle: 'computed fields', options: computedFieldsOptions },
@@ -1150,6 +1232,13 @@ class PermissionBuilder extends React.Component<PermissionBuilderProps> {
             tableDef,
             tableSchemas,
             schemaList,
+            newPrefix
+          );
+        } else if (isSessionVarOperator(operation)) {
+          boolExpValue = renderSessionVarExp(
+            dispatchFunc,
+            operation,
+            expression[operation],
             newPrefix
           );
         } else {

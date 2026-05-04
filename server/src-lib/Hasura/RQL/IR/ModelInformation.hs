@@ -235,6 +235,7 @@ getArgumentModelNamesGen sourceName modelSourceType args = case args of
   BoolAnd args' -> for_ args' (getArgumentModelNamesGen sourceName modelSourceType)
   BoolOr args' -> for_ args' (getArgumentModelNamesGen sourceName modelSourceType)
   BoolNot args' -> getArgumentModelNamesGen sourceName modelSourceType args'
+  BoolSessionVar _ -> pure () -- Session variable conditions don't reference models
   BoolExists g -> do
     getArgumentModelNamesGen sourceName modelSourceType $ _geWhere g
   BoolField field -> case field of

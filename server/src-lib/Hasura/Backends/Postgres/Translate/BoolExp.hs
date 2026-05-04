@@ -9,8 +9,12 @@ module Hasura.Backends.Postgres.Translate.BoolExp
   )
 where
 
+import Data.Aeson (fromJSON, Result(..), eitherDecodeStrict)
 import Data.HashMap.Strict qualified as HashMap
+import Data.Text qualified as T
+import Data.Text.Encoding (encodeUtf8)
 import Data.Text.Extended (ToTxt, toTxt)
+import Hasura.Authentication.Session (getSessionVariableValue)
 import Hasura.Authentication.User (UserInfo (..))
 import Hasura.Backends.Postgres.SQL.DML qualified as S
 import Hasura.Backends.Postgres.SQL.Types hiding (TableName)
@@ -128,6 +132,43 @@ translateBoolExp userInfo = \case
 
     whereExp <- withCurrentTable (S.QualifiedIdentifier identifier Nothing) (translateBoolExp userInfo wh)
     return $ S.mkExists (S.FISimple currTableReference (Just alias)) whereExp
+  BoolSessionVar (SessionVarCondition op var value) -> do
+    -- Check if we have session variables available and can resolve this specific variable
+    let sessionVars = _uiSession userInfo
+        sessionValueMaybe = getSessionVariableValue var sessionVars
+    case sessionValueMaybe of
+      Nothing -> do
+        -- Session variable not available (EXPLAIN without session context or missing variable)
+        -- Generate SQL that will evaluate to false, allowing EXPLAIN to work
+        pure $ S.BELit False
+      Just sessionValue -> do
+        -- Session variable is available - resolve immediately to avoid parameter binding issues
+        -- This works for both normal queries and EXPLAIN queries
+        pure $ case op of
+          SVOEquals ->
+            case fromJSON value of
+              Success (expectedValue :: T.Text) -> 
+                S.BELit $ sessionValue == expectedValue
+              _ -> S.BELit False
+          SVONotEquals ->
+            case fromJSON value of
+              Success (expectedValue :: T.Text) -> 
+                S.BELit $ sessionValue /= expectedValue
+              _ -> S.BELit False
+          SVOContains ->
+            -- Parse session variable as JSON array and check if value is in it
+            case eitherDecodeStrict (encodeUtf8 sessionValue) of
+              Right (sessionList :: [T.Text]) ->
+                case fromJSON value of
+                  Success (expectedValue :: T.Text) -> 
+                    S.BELit $ expectedValue `elem` sessionList
+                  _ -> S.BELit False
+              _ -> S.BELit False -- Session var is not a valid JSON array
+          SVOIn ->
+            case fromJSON value of
+              Success (expectedList :: [T.Text]) -> 
+                S.BELit $ sessionValue `elem` expectedList
+              _ -> S.BELit False
   BoolField boolExp -> case boolExp of
     AVColumn colInfo redactionExp opExps -> do
       BoolExpCtx {rootReference, currTableReference} <- ask
@@ -526,3 +567,4 @@ withRedactionExp tableQual redactionExp userInfo sqlExpression =
     RedactIfFalse gBoolExp -> do
       boolExp <- S.simplifyBoolExp <$> toSQLBoolExp userInfo tableQual gBoolExp
       pure $ S.SECond boolExp sqlExpression S.SENull
+

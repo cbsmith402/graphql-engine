@@ -55,6 +55,15 @@ export const RowPermissionsInput = ({
       label: 'Exist operators',
       items: [{ name: '_exists', value: '_exists' }],
     },
+    sessionVar: {
+      label: 'Session variable operators',
+      items: [
+        { name: '_seq (equals)', value: '_seq' },
+        { name: '_sne (not equals)', value: '_sne' },
+        { name: '_scontains (value in session list)', value: '_scontains' },
+        { name: '_sin (in list)', value: '_sin' },
+      ],
+    },
   };
   return (
     <ForbiddenFeaturesProvider forbidden={forbidden}>

@@ -1,6 +1,7 @@
 import { ObjectOrArrayEntry } from './EntryTypes/ObjectOrArrayEntry';
 import { ExistsEntry } from './EntryTypes/ExistsEntry';
 import { ArrayEntry } from './EntryTypes/ArrayEntry';
+import { SessionVarEntry } from './EntryTypes/SessionVarEntry';
 import { isColumnComparator } from './utils';
 import { ColumnComparatorEntry } from './EntryTypes/ColumnComparatorEntry';
 import { useOperators } from './utils/comparatorsFromSchema';
@@ -52,6 +53,9 @@ export const EntryType = ({
       return null;
     }
     return <ExistsEntry k={k} v={v} path={path} />;
+  }
+  if (k === '_seq' || k === '_sne' || k === '_scontains' || k === '_sin') {
+    return <SessionVarEntry k={k} v={v} path={path} />;
   }
   if (
     operator?.name === '_contains' ||

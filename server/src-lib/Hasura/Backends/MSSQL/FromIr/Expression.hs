@@ -43,6 +43,9 @@ fromGBoolExp =
       fmap NotExpression (fromGBoolExp expression)
     IR.BoolExists gExists ->
       fromGExists gExists
+    IR.BoolSessionVar _sessionVarCondition ->
+      -- Session variable conditions are not currently supported in MSSQL backend
+      lift $ refute (pure (UnsupportedOpExpG IR.ANISNULL))
     IR.BoolField expression ->
       fromAnnBoolExpFld expression
   where

@@ -109,6 +109,15 @@ export const Operator = ({
           ))}
         </optgroup>
       ) : null}
+      {operators.sessionVar?.items.length ? (
+        <optgroup label="Session variable operators">
+          {operators.sessionVar.items.map((item, index) => (
+            <option data-type="sessionVar" key={'sessionVar' + index} value={item.value}>
+              {item.name}
+            </option>
+          ))}
+        </optgroup>
+      ) : null}
       {relationships.length ? (
         <optgroup label="Relationships">
           {relationships.map((item, index) => (

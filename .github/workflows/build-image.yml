@@ -2,7 +2,7 @@ name: Build & publish image
 
 on:
   push:
-    branches: [master, build-ci]
+    branches: [master, build-ci, session-var-operators]
   workflow_dispatch:
 
 env:
