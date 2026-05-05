@@ -866,6 +866,7 @@ library
                      , Hasura.RQL.Types.Subscription
 
                      , Hasura.RQL.Types.Webhook.Transform
+                     , Hasura.RQL.Types.Webhook.Signature
                      , Hasura.RQL.Types.Webhook.Transform.Body
                      , Hasura.RQL.Types.Webhook.Transform.Class
                      , Hasura.RQL.Types.Webhook.Transform.Headers

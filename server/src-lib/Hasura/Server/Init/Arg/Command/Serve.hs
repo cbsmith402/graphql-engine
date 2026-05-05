@@ -1,5 +1,11 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# OPTIONS_GHC -Wno-deprecations #-}
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+
+-- TemplateHaskell is required for the typed-TH splices (`$$(refineTH ...)`)
+-- used throughout this file. hlint doesn't recognize typed splices as a
+-- usage of the extension and will report it as unused.
+{-# HLINT ignore "Unused LANGUAGE pragma" #-}
 
 -- | The Arg Opt.Parser for the 'serve' subcommand.
 module Hasura.Server.Init.Arg.Command.Serve
@@ -77,6 +83,7 @@ module Hasura.Server.Init.Arg.Command.Serve
     traceQueryStatusOption,
     serverTimeoutOption,
     logMaskedVariablesOption,
+    webhookSecretOption,
 
     -- * Pretty Printer
     serveCmdFooter,
@@ -172,6 +179,7 @@ serveCommandParser =
     <*> parseMaxTotalHeaderLength
     <*> parseTriggersErrorLoglevelStatus
     <*> parseAsyncActionsFetchBatchSize
+    <*> parseWebhookSecret
     <*> parsePersistedQueries
     <*> parsePersistedQueriesTtl
     <*> parseRemoteSchemaResponsePriority
@@ -1470,6 +1478,23 @@ logMaskedVariablesOption =
           <> "replaced with \"[MASKED]\" in query-log output."
     }
 
+parseWebhookSecret :: Opt.Parser (Maybe Text)
+parseWebhookSecret =
+  Opt.optional
+    $ Opt.strOption
+      ( Opt.long "webhook-secret"
+          <> Opt.metavar "<SECRET>"
+          <> Opt.help (Config._helpMessage webhookSecretOption)
+      )
+
+webhookSecretOption :: Config.Option ()
+webhookSecretOption =
+  Config.Option
+    { Config._default = (),
+      Config._envVar = "HASURA_GRAPHQL_WEBHOOK_SECRET",
+      Config._helpMessage = "Secret key for signing webhook requests with HMAC-SHA256. Enables webhook signature verification when set."
+    }
+
 --------------------------------------------------------------------------------
 -- Pretty Printer
 
@@ -1579,6 +1604,7 @@ serveCmdFooter =
         Config.optionPP configuredHeaderPrecedenceOption,
         Config.optionPP preserve401ErrorsOption,
         Config.optionPP serverTimeoutOption,
-        Config.optionPP logMaskedVariablesOption
+        Config.optionPP logMaskedVariablesOption,
+        Config.optionPP webhookSecretOption
       ]
     eventEnvs = [Config.optionPP graphqlEventsHttpPoolSizeOption, Config.optionPP graphqlEventsFetchIntervalOption]

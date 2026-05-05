@@ -505,7 +505,8 @@ initialiseAppEnv env BasicConnectionInfo {..} serveOptions@ServeOptions {..} liv
           appEnvPersistedQueries = soPersistedQueries,
           appEnvPersistedQueriesTtl = soPersistedQueriesTtl,
           appEnvPreserve401Errors = soPreserve401Errors,
-          appServerTimeout = soServerTimeout
+          appServerTimeout = soServerTimeout,
+          appEnvWebhookSecret = soWebhookSecret
         }
     )
 
@@ -1413,6 +1414,7 @@ mkHGEServer setupHook appStateRef consoleType ekgStore = do
             (getSchemaCache appStateRef)
             lockedEventsCtx
             appEnvTriggersErrorLogLevelStatus
+            appEnvWebhookSecret
 
 runInSeparateTx ::
   PG.TxE QErr a ->
